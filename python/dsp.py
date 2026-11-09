@@ -41,7 +41,11 @@ def fft(data, window=None):
 
 def create_mel_bank():
     global samples, mel_y, mel_x
-    samples = int(config.MIC_RATE * config.N_ROLLING_HISTORY / (2.0 * config.FPS))
+    # Must match the zero-padded FFT in visualization.microphone_update(),
+    # whose rfft output has n_fft // 2 + 1 bins spanning 0 to MIC_RATE / 2
+    n_window = int(config.MIC_RATE / config.FPS) * config.N_ROLLING_HISTORY
+    n_fft = 2**int(np.ceil(np.log2(n_window)))
+    samples = n_fft // 2 + 1
     mel_y, (_, mel_x) = melbank.compute_melmat(num_mel_bands=config.N_FFT_BINS,
                                                freq_min=config.MIN_FREQUENCY,
                                                freq_max=config.MAX_FREQUENCY,

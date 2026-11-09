@@ -210,7 +210,7 @@ def microphone_update(audio_samples):
         # Pad with zeros until the next power of two
         y_data *= fft_window
         y_padded = np.pad(y_data, (0, N_zeros), mode='constant')
-        YS = np.abs(np.fft.rfft(y_padded)[:N // 2])
+        YS = np.abs(np.fft.rfft(y_padded))
         # Construct a Mel filterbank from the FFT data
         mel = np.atleast_2d(YS).T * dsp.mel_y.T
         # Scale data to values more suitable for visualization
