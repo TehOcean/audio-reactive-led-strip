@@ -2,17 +2,10 @@
 name = "audio-reactive-led-strip"
 version = "0.1.0"
 description = "Real-time LED strip music visualization using Python and the ESP8266 or Raspberry Pi"
-requires-python = ">=3.9,<3.13"
+requires-python = ">=3.10"
 dependencies = [
-    # numpy 2 removed aliases that older pyqtgraph relies on
-    "numpy>=1.21,<2",
-    "scipy",
-    # The GUI code uses QtGui.QApplication and pg.GraphicsWindow, which were
-    # removed in pyqtgraph 0.13
-    "pyqtgraph>=0.11,<0.13",
-    "pyqt5",
-    # Newer pyqt5-qt5 releases ship no Windows wheels
-    "pyqt5-qt5==5.15.2; sys_platform == 'win32'",
+    "numpy>=1.24",
+    "scipy>=1.10",
     # PyAudioWPatch is a drop-in PyAudio fork with WASAPI loopback (capture
     # what the PC is playing); plain PyAudio elsewhere
     "pyaudio; sys_platform != 'win32'",
@@ -21,9 +14,19 @@ dependencies = [
 
 [project.optional-dependencies]
 # Standalone Raspberry Pi (DEVICE = 'pi' in config.py)
-pi = ["rpi-ws281x"]
+pi = ["rpi-ws281x>=4"]
 # BlinkStick (DEVICE = 'blinkstick' in config.py)
 blinkstick = ["blinkstick"]
 
+[dependency-groups]
+# GUI window (USE_GUI = True in config.py). Installed by default; skip it with
+# `uv sync --no-group gui` on machines that run headless, such as a Raspberry
+# Pi, where PyQt6 has no wheels for Raspberry Pi OS Bookworm or 32-bit ARM.
+gui = [
+    "pyqtgraph>=0.13.4",
+    "pyqt6>=6.5",
+]
+
 [tool.uv]
 package = false
+default-groups = ["gui"]

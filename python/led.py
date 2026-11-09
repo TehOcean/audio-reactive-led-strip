@@ -11,10 +11,10 @@ if config.DEVICE == 'esp8266':
     _sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 # Raspberry Pi controls the LED strip directly
 elif config.DEVICE == 'pi':
-    import neopixel
-    strip = neopixel.Adafruit_NeoPixel(config.N_PIXELS, config.LED_PIN,
-                                       config.LED_FREQ_HZ, config.LED_DMA,
-                                       config.LED_INVERT, config.PI_BRIGHTNESS)
+    from rpi_ws281x import PixelStrip
+    strip = PixelStrip(config.N_PIXELS, config.LED_PIN,
+                       config.LED_FREQ_HZ, config.LED_DMA,
+                       config.LED_INVERT, config.PI_BRIGHTNESS)
     strip.begin()
 elif config.DEVICE == 'blinkstick':
     from blinkstick import blinkstick
@@ -117,9 +117,10 @@ def _update_pi():
     # Optional gamma correction
     p = _gamma[pixels] if config.SOFTWARE_GAMMA_CORRECTION else np.copy(pixels)
     p = _apply_brightness(p)
-    # Encode 24-bit LED values in 32 bit integers
-    r = np.left_shift(p[0][:].astype(int), 8)
-    g = np.left_shift(p[1][:].astype(int), 16)
+    # Encode 24-bit LED values as 0xRRGGBB, the format rpi_ws281x's Color()
+    # produces; the library reorders bytes for the strip type (GRB for WS2812)
+    r = np.left_shift(p[0][:].astype(int), 16)
+    g = np.left_shift(p[1][:].astype(int), 8)
     b = p[2][:].astype(int)
     rgb = np.bitwise_or(np.bitwise_or(r, g), b)
     # Update the pixels
@@ -127,8 +128,7 @@ def _update_pi():
         # Ignore pixels if they haven't changed (saves bandwidth)
         if np.array_equal(p[:, i], _prev_pixels[:, i]):
             continue
-        #strip._led_data[i] = rgb[i]
-        strip._led_data[i] = int(rgb[i])
+        strip.setPixelColor(i, int(rgb[i]))
     _prev_pixels = np.copy(p)
     strip.show()
 
