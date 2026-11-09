@@ -14,7 +14,7 @@ elif config.DEVICE == 'pi':
     import neopixel
     strip = neopixel.Adafruit_NeoPixel(config.N_PIXELS, config.LED_PIN,
                                        config.LED_FREQ_HZ, config.LED_DMA,
-                                       config.LED_INVERT, config.BRIGHTNESS)
+                                       config.LED_INVERT, config.PI_BRIGHTNESS)
     strip.begin()
 elif config.DEVICE == 'blinkstick':
     from blinkstick import blinkstick
@@ -42,6 +42,22 @@ pixels = np.tile(1, (3, config.N_PIXELS))
 
 _is_python_2 = int(platform.python_version_tuple()[0]) == 2
 
+BRIGHTNESS_GAMMA = 2.2
+"""Perceptual curve applied to config.BRIGHTNESS
+
+Eyes perceive light roughly as its square root, so scaling LED output
+linearly makes 20-100% look nearly the same while 0-20% changes a lot.
+Raising the setting to this power makes equal slider steps look like
+equal changes in brightness (50% looks about half as bright).
+"""
+
+
+def _apply_brightness(p):
+    """Scales pixel values by config.BRIGHTNESS (0 to 1, perceptual)"""
+    brightness = min(max(config.BRIGHTNESS, 0.0), 1.0) ** BRIGHTNESS_GAMMA
+    return (p * brightness).astype(int)
+
+
 def _update_esp8266():
     """Sends UDP packets to ESP8266 to update LED strip values
 
@@ -62,7 +78,13 @@ def _update_esp8266():
     pixels = np.clip(pixels, 0, 255).astype(int)
     # Optionally apply gamma correc tio
     p = _gamma[pixels] if config.SOFTWARE_GAMMA_CORRECTION else np.copy(pixels)
-    MAX_PIXELS_PER_PACKET = 126
+    p = _apply_brightness(p)
+    # 4 bytes per pixel; the firmware's packet buffer is BUFFER_LEN = 1024
+    # bytes and it writes one byte past the packet, so 255 pixels (1,020
+    # bytes) is the most that fits. The firmware refreshes the strip after
+    # every packet, so fitting a whole frame in one packet avoids a second
+    # ~6 ms strip refresh per frame.
+    MAX_PIXELS_PER_PACKET = 255
     # Pixel indices
     idx = range(pixels.shape[1])
     idx = [i for i in idx if not np.array_equal(p[:, i], _prev_pixels[:, i])]
@@ -94,6 +116,7 @@ def _update_pi():
     pixels = np.clip(pixels, 0, 255).astype(int)
     # Optional gamma correction
     p = _gamma[pixels] if config.SOFTWARE_GAMMA_CORRECTION else np.copy(pixels)
+    p = _apply_brightness(p)
     # Encode 24-bit LED values in 32 bit integers
     r = np.left_shift(p[0][:].astype(int), 8)
     g = np.left_shift(p[1][:].astype(int), 16)
@@ -119,6 +142,7 @@ def _update_blinkstick():
     pixels = np.clip(pixels, 0, 255).astype(int)
     # Optional gamma correction
     p = _gamma[pixels] if config.SOFTWARE_GAMMA_CORRECTION else np.copy(pixels)
+    p = _apply_brightness(p)
     # Read the rgb values
     r = p[0][:].astype(int)
     g = p[1][:].astype(int)

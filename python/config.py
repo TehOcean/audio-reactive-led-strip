@@ -17,12 +17,18 @@ audio input and control the LED strip directly.
 to control the leds connected to it.
 """
 
+BRIGHTNESS = 1.0
+"""LED brightness between 0 and 1 (applies to pi, esp8266 and blinkstick)
+
+Can also be adjusted live with the brightness slider in the GUI.
+"""
+
 if DEVICE == 'esp8266':
-    UDP_IP = '192.168.0.150'
+    UDP_IP = '10.0.0.13'
     """IP address of the ESP8266. Must match IP in ws2812_controller.ino"""
     UDP_PORT = 7777
     """Port number used for socket communication between Python and ESP8266"""
-    SOFTWARE_GAMMA_CORRECTION = False
+    SOFTWARE_GAMMA_CORRECTION = True
     """Set to False because the firmware handles gamma correction + dither"""
 
 if DEVICE == 'pi':
@@ -32,8 +38,9 @@ if DEVICE == 'pi':
     """LED signal frequency in Hz (usually 800kHz)"""
     LED_DMA = 5
     """DMA channel used for generating PWM signal (try 5)"""
-    BRIGHTNESS = 255
-    """Brightness of LED strip between 0 and 255"""
+    PI_BRIGHTNESS = 255
+    """Hardware brightness of LED strip between 0 and 255. Use BRIGHTNESS
+    above for normal brightness control; it is applied in software."""
     LED_INVERT = True
     """Set True if using an inverting logic level converter"""
     SOFTWARE_GAMMA_CORRECTION = True
@@ -46,17 +53,49 @@ if DEVICE == 'blinkstick':
 USE_GUI = True
 """Whether or not to display a PyQtGraph GUI plot of visualization"""
 
+GUI_FPS = 15
+"""How many times per second the GUI plots are redrawn
+
+Drawing the plots is by far the most expensive part of each frame (about
+20 ms vs about 1 ms for the audio processing), so redrawing them every frame
+keeps the visualization below its target FPS and adds latency. The LEDs
+still update at the full FPS; sliders and effect buttons stay responsive.
+"""
+
 DISPLAY_FPS = True
 """Whether to display the FPS when running (can reduce performance)"""
 
-N_PIXELS = 60
+N_PIXELS = 200
 """Number of pixels in the LED strip (must match ESP8266 firmware)"""
 
 GAMMA_TABLE_PATH = os.path.join(os.path.dirname(__file__), 'gamma_table.npy')
 """Location of the gamma correction table"""
 
+AUDIO_SOURCE = 'loopback'
+"""Audio input used for the visualization. Must be 'loopback' or 'microphone'
+
+'loopback' captures whatever this PC is playing through its default output
+device (Windows only, uses WASAPI loopback via PyAudioWPatch).
+
+'microphone' records from the default input device.
+"""
+
 MIC_RATE = 44100
-"""Sampling frequency of the microphone in Hz"""
+"""Sampling frequency of the microphone in Hz
+
+When AUDIO_SOURCE is 'loopback' this is replaced with the output device's
+own sample rate (usually 48000 Hz), since loopback capture can't resample.
+"""
+
+if AUDIO_SOURCE == 'loopback':
+    import pyaudiowpatch as _pyaudio
+    _pa = _pyaudio.PyAudio()
+    try:
+        LOOPBACK_DEVICE = _pa.get_default_wasapi_loopback()
+        """PyAudio device info for the loopback of the default output device"""
+    finally:
+        _pa.terminate()
+    MIC_RATE = int(LOOPBACK_DEVICE['defaultSampleRate'])
 
 FPS = 60
 """Desired refresh rate of the visualization (frames per second)
@@ -77,7 +116,7 @@ depends on how long the LED strip is.
 _max_led_FPS = int(((N_PIXELS * 30e-6) + 50e-6)**-1.0)
 assert FPS <= _max_led_FPS, 'FPS must be <= {}'.format(_max_led_FPS)
 
-MIN_FREQUENCY = 200
+MIN_FREQUENCY = 50
 """Frequencies below this value will be removed during audio processing"""
 
 MAX_FREQUENCY = 12000

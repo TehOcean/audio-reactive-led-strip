@@ -23,7 +23,7 @@ The repository includes everything needed to build an LED strip music visualizer
 # What do I need to make one?
 ## Computer + ESP8266
 To build a visualizer using a computer and ESP8266, you will need:
-- Computer with Python 2.7 or 3.5 ([Anaconda](https://www.anaconda.com/distribution/) is recommended on Windows)
+- Computer with Python 3.9–3.12 (installed automatically by [uv](https://docs.astral.sh/uv/))
 - ESP8266 module with RX1 pin exposed. These modules can be purchased for as little as $5 USD. These modules are known to be compatible, but many others will work too:
   - NodeMCU v3
   - Adafruit HUZZAH
@@ -49,52 +49,35 @@ Limitations when using the Raspberry Pi:
 
 # Installation for Computer + ESP8266
 ## Python Dependencies
-Visualization code is compatible with Python 2.7 or 3.5. A few Python dependencies must also be installed:
+Python dependencies are managed with [uv](https://docs.astral.sh/uv/) and declared in [python/pyproject.toml](python/pyproject.toml):
 - Numpy
 - Scipy (for digital signal processing)
-- PyQtGraph (for GUI visualization)
+- PyQtGraph + PyQt5 (for GUI visualization)
 - PyAudio (for recording audio with microphone)
 
-On Windows machines, the use of [Anaconda](https://www.anaconda.com/distribution/) is **highly recommended**. Anaconda simplifies the installation of Python dependencies, which is sometimes difficult on Windows.
-
-### Installing dependencies with Anaconda
-Create a [conda virtual environment](http://conda.pydata.org/docs/using/envs.html) (this step is optional but recommended)
+[Install uv](https://docs.astral.sh/uv/getting-started/installation/), then from the root of this repository run:
 ```
-conda create --name visualization-env python=3.5
-activate visualization-env
+cd python
+uv sync
 ```
-Install dependencies using pip and the conda package manager
-```
-conda install numpy scipy pyqtgraph
-pip install pyaudio
-```
-
-### Installing dependencies without Anaconda
-The pip package manager can also be used to install the python dependencies.
-```
-pip install numpy
-pip install scipy
-pip install pyqtgraph
-pip install pyaudio
-```
-If `pip` is not found try using `python -m pip install` instead.
+This downloads a compatible Python (see [python/.python-version](python/.python-version)) if needed, creates a `python/.venv` virtual environment, and installs the locked dependencies from `python/uv.lock`.
 
 ### Installing macOS dependencies
-On macOS, python3 is required and `portaudio` must be used in place of `pyaudio`.
+On macOS, `portaudio` must be installed before PyAudio can be built.
 If you don't have brew installed you can get it here: https://brew.sh
 
 ```
 brew install portaudio
-brew install pyqt5
-pip3 install numpy
-pip3 install scipy
-pip3 install pyqtgraph
-pip3 install pyaudio
+cd python
+uv sync
 ```
 
-Running the visualization can be done using the command below.
-
-`python3 visualization.py /tmp`
+## Running the visualization
+Run the visualization from the `python` directory using `uv run`, which uses the project's virtual environment automatically:
+```
+cd python
+uv run python visualization.py
+```
 
 ## Arduino dependencies
 ESP8266 firmare is uploaded using the Arduino IDE. See [this tutorial](https://learn.sparkfun.com/tutorials/esp8266-thing-hookup-guide/installing-the-esp8266-arduino-addon) to setup the Arduino IDE for ESP8266.

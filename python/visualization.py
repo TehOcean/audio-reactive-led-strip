@@ -186,10 +186,11 @@ volume = dsp.ExpFilter(config.MIN_VOLUME_THRESHOLD,
                        alpha_decay=0.02, alpha_rise=0.02)
 fft_window = np.hamming(int(config.MIC_RATE / config.FPS) * config.N_ROLLING_HISTORY)
 prev_fps_update = time.time()
+prev_gui_update = time.time()
 
 
 def microphone_update(audio_samples):
-    global y_roll, prev_rms, prev_exp, prev_fps_update
+    global y_roll, prev_rms, prev_exp, prev_fps_update, prev_gui_update
     # Normalize samples between 0 and 1
     y = audio_samples / 2.0**15
     # Construct a rolling window of audio samples
@@ -224,7 +225,8 @@ def microphone_update(audio_samples):
         output = visualization_effect(mel)
         led.pixels = output
         led.update()
-        if config.USE_GUI:
+        if config.USE_GUI and time.time() - prev_gui_update >= 1.0 / config.GUI_FPS:
+            prev_gui_update = time.time()
             # Plot filterbank output
             x = np.linspace(config.MIN_FREQUENCY, config.MAX_FREQUENCY, len(mel))
             mel_curve.setData(x=x, y=fft_plot_filter.update(mel))
@@ -234,6 +236,11 @@ def microphone_update(audio_samples):
             b_curve.setData(y=led.pixels[2])
     if config.USE_GUI:
         app.processEvents()
+        if not view.isVisible():
+            # Window was closed. The audio loop never returns on its own, so
+            # without this the process would keep running in the background
+            # (with no console to close when launched via pythonw).
+            raise SystemExit
     
     if config.DISPLAY_FPS:
         fps = frames_per_second()
@@ -312,6 +319,19 @@ if __name__ == '__main__':
         freq_label.setText('Frequency range: {} - {} Hz'.format(
             config.MIN_FREQUENCY,
             config.MAX_FREQUENCY))
+        # Brightness label
+        bright_label = pg.LabelItem('')
+        # Brightness slider
+        def bright_slider_change(slider):
+            config.BRIGHTNESS = bright_slider.tickValue(0)
+            bright_label.setText('Brightness: {:.0f}%'.format(config.BRIGHTNESS * 100))
+        bright_slider = pg.TickSliderItem(orientation='bottom', allowAdd=False)
+        bright_slider.addTick(config.BRIGHTNESS, color='#16dbeb', movable=True)
+        # addTick() binds tickMoveFinished at call time, so overriding it
+        # afterwards (as the frequency slider does beforehand) has no effect.
+        # The change-finished signal fires on drag release regardless.
+        bright_slider.sigTicksChangeFinished.connect(bright_slider_change)
+        bright_label.setText('Brightness: {:.0f}%'.format(config.BRIGHTNESS * 100))
         # Effect selection
         active_color = '#16dbeb'
         inactive_color = '#FFFFFF'
@@ -350,7 +370,17 @@ if __name__ == '__main__':
         layout.addItem(energy_label)
         layout.addItem(scroll_label)
         layout.addItem(spectrum_label)
+        layout.nextRow()
+        layout.addItem(bright_label, colspan=3)
+        layout.nextRow()
+        layout.addItem(bright_slider, colspan=3)
     # Initialize LEDs
     led.update()
     # Start listening to live audio stream
-    microphone.start_stream(microphone_update)
+    try:
+        microphone.start_stream(microphone_update)
+    finally:
+        # Blank the strip on exit (window closed, Ctrl+C or error) instead of
+        # leaving it frozen on the last frame
+        led.pixels = np.tile(0, (3, config.N_PIXELS))
+        led.update()
